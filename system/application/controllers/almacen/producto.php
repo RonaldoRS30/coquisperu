@@ -272,11 +272,11 @@ class Producto extends Controller{
                  /*
                 
                 #$barcode = " <a onclick='barcode($valor->PROD_Codigo)' style='cursor:pointer;'><img src='" . base_url() . "images/barcode.png' width='40' height='40' border='0' title='Codigo de Barras'></a>";
-                
+                */
                 $barcode  = "<a href='".base_url()."index.php/almacen/producto/ver_barcode/$valor->PROD_Codigo' data-fancybox data-type='iframe'><img src='".base_url()."images/barcode.png' width='16' height='16' border='0' title='Codigo Barras'></a>";
                 $j++;
                 $lista[$indice][$j] = $barcode;
-                */
+                
 
             }
         }

@@ -641,7 +641,7 @@ class Lib_props
   {
     #$persona = ($persona == NULL) ? $_SESSION['persona'] : $persona; # CAMBIO PARA SHARKS - SOLAMENTE MUESTRA AL VENDEDOR LOGUEADO
 
-    $data = $this->ci->directivo_model->listarVendedores($persona);
+    $data = $this->ci->directivo_model->listarVendedores();
     $option = "<option value=''>SELECCIONAR</option>";
 
     foreach ($data as $indice => $fila) {

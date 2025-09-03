@@ -57,7 +57,7 @@
                         </div>
                         <div class="col-sm-2 col-md-2 col-lg-2">
                             <label for="tipo_documento">Codigo Barras</label>
-                            <input type="text" class="form-control h-2 w-porc-90" name="tempde_barcode" id="tempde_barcode" placeholder="codigo de barras">
+                            <input type="text" class="form-control h-2 w-porc-90" name="tempde_barcode" id="tempde_barcode" placeholder="codigo de barras" autofocus>
                         </div>
                         <div class="col-sm-6 col-md-6 col-lg-6">
                             <label for="numero_documento">Descripción</label>
@@ -729,6 +729,10 @@
         idMarca = marca.split(' - ');
         listar_modelo( idMarca[0] );
     });
+ 
+$(document).on('shown.bs.modal', function () {
+    $('#tempde_barcode').focus();
+});
 
     $("#linkVerVentasArticulo").click(function(){
         var url = "<?php echo base_url(); ?>index.php/maestros/temporaldetalle/cantidad_ventas_articulo";
@@ -1252,6 +1256,7 @@
         fila += '<input type="hidden" name="prodcantidad[' + n + ']" id="prodcantidad[' + n + ']" value="' + cantidad + '"><span id="prodcantidad_span['+n+']"> '+parseFloat(cantidad).toFixed(2)+'</span>';
         fila += '</div></td>';
 
+        
         fila += '<td width="10%"><div style="text-align:center;"><span id="prod_precio_span_sigv['+n+']">'+parseFloat(precio_sinigv).toFixed(2)+'</span></div></td>';
 
         fila += '<td width="10%"><div style="text-align:center;"><span id="prod_precio_span['+n+']">'+parseFloat(precio_conigv).toFixed(2)+'</span></div></td>';
@@ -1313,20 +1318,35 @@
     }
 
     function agregar_productotemp_modificado(fila){
-        flagBS = $("#flagBS").val();
 
-        if ($("#tempde_codproducto").val() == '') {
-            $("#tempde_codproducto").focus();
-            //alert('Ingrese el producto.');
-            Swal.fire({
-                icon: "info",
-                title: "Ingrese el producto.",
-                html: "<b class='color-red'></b>",
-                showConfirmButton: true,
-                timer: 2000
-            });
-            return false;
+  
+        flagBS = $("#flagBS").val(); 
+
+            let codproducto = $("#tempde_codproducto").val();
+
+               // 🔍 Verificar si el producto ya existe en la lista
+    let existe = false;
+    $("input[name^='prodcodigo']").each(function(){
+        if ($(this).val() == codproducto) {
+            existe = true;
+            return false; // corta el bucle
         }
+    });
+
+    
+    if (codproducto == '' && !existe) {
+        $("#tempde_codproducto").focus();
+        Swal.fire({
+            icon: "info",
+            title: "Ingrese el producto.",
+            html: "<b class='color-red'></b>",
+            showConfirmButton: true,
+            timer: 2000
+        });
+        return false;
+    }
+
+
         if ($("#tempde_cantidad").val() == '') {
             $("#tempde_cantidad").focus();
             //alert('Ingrese una cantidad.');
@@ -1607,7 +1627,10 @@
                     $("#tempde_prodStock").val("");
                     $("#tempde_prodStock").css("background-color","#ffffff");
                     $("#tempde_message").show();
-                    limpiar_campos_modal();
+                    limpiar_campos_modal(); 
+
+                            $("#tempde_barcode").focus();
+
                 }
                 else { alert("intentelo nuevamente.");}
             }
@@ -1624,6 +1647,8 @@
         return cantidad;
     }
 
+
+    ///esta funcion ejecuta parar el botn aceptar pero con la condición de cambias de codigo de barras detecta esta función
     function modificar_prodtemporal(){
         var url = "<?php echo base_url(); ?>index.php/maestros/temporaldetalle/modificar_prodtemporal";
         dataString = $("#form_tempdetalle").serialize();
@@ -1644,10 +1669,11 @@
                     $("#tempde_prodStock").css("background-color","#ffffff");
                     $("#tempde_message").show();
 
-                    $("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
-                    //$("#tempde_aceptar").attr("onclick","agregar_productotemp_modificado("+fila+")");
-                    limpiar_campos_modal();
-
+                   // $("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
+      // SOLO preparar el botón, NO ejecutar
+                $("#tempde_aceptar").attr("onclick", "agregar_productotemp_modificado(" + fila + ")");       
+                             limpiar_campos_modal();
+                     $("#tempde_barcode").focus();
                 }
                 else { 
                     alert("No se pudo modificar los datos");
@@ -1657,6 +1683,8 @@
         });
     }
 
+
+    //funcion que abre el modal de editar ///////////////////////////////////////////////////////////
     function editar_producto_temporal(fila){
         limpiar_campos_modal();
         var d = "detacodi["+fila+"]";
@@ -1672,14 +1700,14 @@
         stock       = document.getElementById(s).value;
         idLote      = document.getElementById(l).value;
         var url = "<?php echo base_url(); ?>index.php/maestros/temporaldetalle/obtener_producto_temporal";
+
         if (detalleId == '') {
             document.getElementById(m).value='m';
         }else{
             document.getElementById(m).value='m';
             document.getElementById(e).value='m';
         }
-        //$("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
-        $("#tempde_aceptar").attr("onclick","agregar_productotemp_modificado("+fila+")");
+       
         var tempSession = $("#tempSession").val();
         $.ajax({
             url:url,
@@ -1704,7 +1732,7 @@
                     $("#tempde_prodStock").val(item.stock);
                     $("#tempde_productocosto").val(item.TEMPDE_Costo);
                     $("#tempde_cantidad").val(item.TEMPDE_Cantidad);
-                    $("#tempde_precioUnitario ").val(item.TEMPDE_Precio);
+                    $("#tempde_precioUnitario").val(item.TEMPDE_Precio);
                     $("#tempde_subTotal").val(item.TEMPDE_Subtotal);
                     //tipo_afectacion_temproductos(item.TEMPDE_TipoIgv);
                     $("#tempde_tipoIgv").val(item.TEMPDE_TipoIgv);
@@ -1714,10 +1742,13 @@
                     $("#serie_anticipo").val(item.TEMPDE_AntSerie);
                     $("#numero_anticipo").val(item.TEMPDE_AntNumero);
 
-                    lotes(item.PROD_Codigo, almacen, idLote);
+                    
                     flagBolsa(item.TEMPDE_ICBPER);
                     flagAnticipo(item.TEMPDE_Anticipo);
                 });
+
+                            $("#tempde_aceptar").attr("onclick", "agregar_productotemp_modificado(" + fila + ")");
+
             }
         })
     }
@@ -2611,7 +2642,7 @@
                                 
                                 agregar_productotemp_modificado(i);
                                 $("#tempde_barcode").val("");
-                                
+                             
                             }else{
                                 if (precio=="" ||  precio=="0") {
                                     Swal.fire({
@@ -2728,7 +2759,14 @@
                                             editar_producto_temporal_pistoleao(i);
                                             flag = 1;
                                             $("#tempde_barcode").val("");
-                                            calcular_temProducto_modal();
+                                            $("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
+
+                                    //$("#tempde_cantidad").focus();
+                                    calcular_temProducto_modal();
+                                      setTimeout(function() {
+                                            agregar_producto_temporal();
+                                        }, 500);
+                                           
                                         }
                                     }
                                 }
@@ -2788,9 +2826,14 @@
                                     $("#tempde_cantidad").val(1);
                                     $("#tempde_barcode").val("");
                                     $("#bar_code").val(codigo_interno);
+                                    $("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
+
                                     //$("#tempde_cantidad").focus();
                                     calcular_temProducto_modal();
-                                }
+                                      setTimeout(function() {
+                                            agregar_producto_temporal();
+                                        }, 500);
+                                } 
                             }else{
                                 Swal.fire({
                                     icon: "warning",
@@ -2819,66 +2862,82 @@
         }
     }
 
-    function editar_producto_temporal_pistoleao(fila){
-        limpiar_campos_modal();
-        
-        var d = "detacodi["+fila+"]";
-        var p = "prodcodigo["+fila+"]";
-        var a = "almacenProducto["+fila+"]";
-        var s = "prodstock["+fila+"]";
-        var m = "modalAccion["+fila+"]";
-        var e = "detaccion["+fila+"]";
-        var l = "idLote["+fila+"]";
-        detalleId   = document.getElementById(d).value;
-        codProducto = document.getElementById(p).value;
-        almacen     = document.getElementById(a).value;
-        stock       = document.getElementById(s).value;
-        idLote      = document.getElementById(l).value;
-        var url = "<?php echo base_url(); ?>index.php/maestros/temporaldetalle/obtener_producto_temporal";
-        if (detalleId == '') {
-            document.getElementById(m).value='m';
-        }else{
-            document.getElementById(m).value='m';
-            document.getElementById(e).value='m';
-        }
-        //$("#tempde_aceptar").attr("onclick","agregar_producto_temporal()");
-        $("#tempde_aceptar").attr("onclick","agregar_productotemp_modificado("+fila+")");
-        var tempSession = $("#tempSession").val();
-        $.ajax({
-            url:url,
-            data:{ detalleId: detalleId, codproducto: codProducto, tempSession: tempSession, idLote: idLote},
-            type:"POST",
-            dataType: "json",
-            success:function(data){
-                $.each(data.datos, function (i, item) {
-                    
-                    var cantidad = parseFloat(item.TEMPDE_Cantidad)+1;
-                    $("#tempde_cantidad").val(cantidad);
-                    $("#tempde_id").val(item.TEMPDE_Codigo);
-                    $("#tempde_codproducto").val(item.PROD_Codigo);
-                    $("#bar_code").val(item.codigo_usuario);
-                    $("#tempde_almacenproducto").val(almacen);
-                    $("#tempde_unidadmedida").val(item.UNDMED_Codigo);  
-                    $("#tempde_moneda").val(item.MONED_Codigo);
-                    $("#tempde_descuento").val(item.TEMPDE_Descuento);
-                    $("#tempde_igvLinea").val(item.TEMPDE_Igv);
-                    $("#tempde_filtro_marca").val(' - ' + item.marca);
-                    $("#tempde_producto").val(item.TEMPDE_Descripcion);
-                    $("#tempde_producto").attr('readonly','readonly');
-                    $("#tempde_detalleItem").val(item.TEMPDE_Observacion);
-                    $("#tempde_prodStock").val(item.stock);
-                    $("#tempde_productocosto").val(item.TEMPDE_Costo);
-                    $("#tempde_precioUnitario ").val(item.TEMPDE_Precio);
-                    $("#tempde_subTotal").val(item.TEMPDE_Subtotal);
-                    $("#tempde_tipoIgv").val(item.TEMPDE_TipoIgv);
-                    $("#tempde_total").val(item.TEMPDE_Total);
-                    lotes(item.PROD_Codigo, almacen, idLote);
-                    flagBolsa(item.TEMPDE_ICBPER);
-
-                });
-            }
-        })
+function editar_producto_temporal_pistoleao(fila){
+    limpiar_campos_modal();
+    
+    var d = "detacodi["+fila+"]";
+    var p = "prodcodigo["+fila+"]";
+    var a = "almacenProducto["+fila+"]";
+    var s = "prodstock["+fila+"]";
+    var m = "modalAccion["+fila+"]";
+    var e = "detaccion["+fila+"]";
+    var l = "idLote["+fila+"]";
+    
+    detalleId   = document.getElementById(d).value;
+    codProducto = document.getElementById(p).value;
+    almacen     = document.getElementById(a).value;
+    stock       = document.getElementById(s).value;
+    idLote      = document.getElementById(l).value;
+    
+    var url = "<?php echo base_url(); ?>index.php/maestros/temporaldetalle/obtener_producto_temporal";
+    
+    if (detalleId == '') {
+        document.getElementById(m).value='m';
+    } else {
+        document.getElementById(m).value='m';
+        document.getElementById(e).value='m';
     }
+
+    var tempSession = $("#tempSession").val();
+    $.ajax({
+        url: url,
+        data: { 
+            detalleId: detalleId, 
+            codproducto: codProducto, 
+            tempSession: tempSession, 
+            idLote: idLote
+        },
+        type: "POST",
+        dataType: "json",
+        success: function(data){
+            $.each(data.datos, function (i, item) {
+                
+                var cantidad = parseFloat(item.TEMPDE_Cantidad) + 1;
+                $("#tempde_cantidad").val(cantidad);
+                $("#tempde_id").val(item.TEMPDE_Codigo);
+                $("#tempde_codproducto").val(item.PROD_Codigo);
+                $("#bar_code").val(item.codigo_usuario);
+                $("#tempde_almacenproducto").val(almacen);
+                $("#tempde_unidadmedida").val(item.UNDMED_Codigo);  
+                $("#tempde_moneda").val(item.MONED_Codigo);
+                $("#tempde_descuento").val(item.TEMPDE_Descuento);
+                $("#tempde_igvLinea").val(item.TEMPDE_Igv);
+                $("#tempde_filtro_marca").val(' - ' + item.marca);
+                $("#tempde_producto").val(item.TEMPDE_Descripcion);
+                $("#tempde_producto").attr('readonly','readonly');
+                $("#tempde_detalleItem").val(item.TEMPDE_Observacion);
+                $("#tempde_prodStock").val(item.stock);
+                $("#tempde_productocosto").val(item.TEMPDE_Costo);
+                $("#tempde_precioUnitario").val(item.TEMPDE_Precio);
+                $("#tempde_subTotal").val(item.TEMPDE_Subtotal);
+                $("#tempde_tipoIgv").val(item.TEMPDE_TipoIgv);
+                $("#tempde_total").val(item.TEMPDE_Total);
+                flagBolsa(item.TEMPDE_ICBPER);
+            });
+
+            // EJECUCIÓN AUTOMÁTICA después de 500ms
+            setTimeout(function() {
+                calcular_temProducto_modal();
+                agregar_productotemp_modificado(fila); // ← Se ejecuta automáticamente
+            }, 500);
+        },
+        error: function(xhr, status, error) {  // ← ¡CORREGIDO! Falta la coma y está bien ubicado
+            console.error("Error AJAX:", error);
+        }
+    });
+}
+
+
 
 //FIN CODIGO DE BARRA
 

@@ -189,7 +189,7 @@
                                 <?php if ($user == 1): ?>
                                 <th style="width: 05%" data-orderable="false">DEL</th>
                                 <?php endif; ?>
-                                <!--<th style="width: 05%" data-orderable="false">BARCODE</th>-->
+                                <th style="width: 05%" data-orderable="false">BARCODE</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
