@@ -463,6 +463,7 @@ class Comprobante extends Controller{
                                 $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
                                 $filter->CAJAMOV_FlagEstado     = "1";
                                 $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
+                                $filter->CPP_Codigo = $comprobante->CPP_Codigo;
                                 $this->movimientos->guardar_movimiento($filter);
                             }
 
@@ -491,6 +492,7 @@ class Comprobante extends Controller{
                                         $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
                                         $filter->CAJAMOV_FlagEstado     = "1";
                                         $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
+                                        $filter->CPP_Codigo = $comprobante->CPP_Codigo;
                                         $this->movimientos->guardar_movimiento($filter);
                                     }else{
                                         switch ($comprobante->CPC_TipoDocumento) {

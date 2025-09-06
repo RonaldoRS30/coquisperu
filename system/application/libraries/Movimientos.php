@@ -34,6 +34,7 @@ class Movimientos{
         $filter->CAJAMOV_Observacion 	= strtoupper($info->CAJAMOV_Observacion);
         $filter->CAJAMOV_FlagEstado 	= (isset($info->CAJAMOV_FlagEstado) && $info->CAJAMOV_FlagEstado != NULL) ? $info->CAJAMOV_FlagEstado : 1;
         $filter->CAJAMOV_CodigoUsuario 	= $info->CAJAMOV_CodigoUsuario;
+        $filter->CPP_Codigo             = $info->CPP_Codigo;
 
         if ($movimiento != ""){
             $filter->CAJAMOV_Codigo = $movimiento;
