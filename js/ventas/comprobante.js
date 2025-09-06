@@ -618,8 +618,6 @@ jQuery(document).ready(function () {
         return false;
     });
 
-    
-
 });
 
     $("#nuevaComprobante").click(function () {
@@ -635,9 +633,17 @@ jQuery(document).ready(function () {
         $("#frmComprobante").submit();
     });
 
+    // Variable para verificar si el botón "Agregar +" ha sido clickeado
+    var botonAgregarClickeado = false;
+
+    // Función que se llama cuando el botón "Agregar +" es clickeado
+    $("#openModalFormaPago").on('click', function () {
+        botonAgregarClickeado = true;  // Marcamos que se ha clickeado el botón
+    });
+
     //Guardar el comprobante
-    $("#grabarComprobante").click(function () {
-        
+    $("#grabarComprobante").click(function (event) {
+        $("#grabarComprobante").css("pointer-events", "none");
         //if ( $("#VerificadoSuccess").val() == "1" ){
             var tipoOperacion = $('#tipo_oper').val();
             var tipoDocumento = $('#tipo_docu').val();
@@ -657,6 +663,7 @@ jQuery(document).ready(function () {
                         showConfirmButton: true,
                         timer: 1500
                     });
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
 
                 }
@@ -668,6 +675,7 @@ jQuery(document).ready(function () {
                         showConfirmButton: true,
                         timer: 1500
                     });
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
                 if (medio_pago_det=="") {
@@ -678,6 +686,7 @@ jQuery(document).ready(function () {
                         showConfirmButton: true,
                         timer: 1500
                     });
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
                 if (total_detraccion=="" || total_detraccion=="0") {
@@ -688,12 +697,13 @@ jQuery(document).ready(function () {
                         showConfirmButton: true,
                         timer: 1500
                     });
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
                 
             }
            
-            //$("#grabarComprobante").css('visibility', 'hidden');
+           // $("#grabarComprobante").css('visibility', 'hidden');
             var codigo = $('#codigo').val();
             var tipo_d = $("#cboTipoDocu").val();
             if ($("#serie").val() == "") {
@@ -708,8 +718,60 @@ jQuery(document).ready(function () {
                 });
                 $('#grabarComprobante').css('visibility', 'visible');
                 $('img#loading').css('visibility', 'hidden');
+                $("#grabarComprobante").css("pointer-events", "auto");
                 return false;
             }
+
+            if ( $("#caja").val()=="")
+                {
+                    $("#caja").focus();
+               
+                    Swal.fire
+                    (
+                        {
+                            icon: "info",
+                            title: "Debe elegir una caja o activarla.",
+                            html: "<b class='color-red'></b>",
+                            showConfirmButton: true,
+                            timer: 1500
+                        }
+                    );
+                    
+                    $('#grabarComprobante').css('visibility', 'visible');
+                    $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
+                        
+                    return false;
+                }
+
+            if ($('#forma_pago').val()) {
+                var currentText = document.getElementById('forma_pago').options[document.getElementById('forma_pago').selectedIndex].innerText.toLowerCase();
+                var esMultiple = /multiple/g.test(currentText);
+
+                // Si la opción es "multiple" y no se ha clickeado el botón "Agregar"
+                if (esMultiple && !botonAgregarClickeado) {
+                    // Enfocar en el botón "Agregar"
+                    $("#openModalFormaPago").focus();
+
+                    // Mostrar alerta usando SweetAlert
+                    Swal.fire({
+                        icon: "info",
+                        title: "Debe presionar el botón +AGREGAR.",
+                        html: "<b class='color-red'></b>",
+                        showConfirmButton: true,
+                        timer: 1500
+                    });
+
+                    // Evitar el envío del formulario
+                    $('#grabarComprobante').css('visibility', 'visible');
+                    event.preventDefault();  // Detener el proceso
+                    $("#grabarComprobante").css("pointer-events", "auto");
+                    return;  // Asegúrate de detener la ejecución aquí
+                }
+            }
+            
+      
+
             if ($("#almacen").val() == "") {
                 $("#almacen").focus();
                 //alert("Ingrese la almacen.");
@@ -722,12 +784,13 @@ jQuery(document).ready(function () {
                 });
                 $('#grabarComprobante').css('visibility', 'visible');
                 $('img#loading').css('visibility', 'hidden');
+                $("#grabarComprobante").css("pointer-events", "auto");
                 return false;
             }
             if (tipo_oper == 'C') {
                 if ($("#numero").val() == "") {
                     $("#numero").focus();
-                    
+                    //alert("Ingrese el numero documento.");
                     Swal.fire({
                         icon: "info",
                         title: "Ingrese el numero documento.",
@@ -737,13 +800,14 @@ jQuery(document).ready(function () {
                     });
                     $('#grabarComprobante').css('visibility', 'visible');
                     $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
             }
 
             if ($('#moneda').val() == '') {
                 $("#moneda").focus();
-                
+                //alert("Debe seleccionar Moneda.");
                 Swal.fire({
                     icon: "info",
                     title: "Debe seleccionar Moneda.",
@@ -756,24 +820,9 @@ jQuery(document).ready(function () {
                 return false;
             }
 
-            if ($('#tdcDolar').val() == '') {
-                $("#tdcDolar").focus();
-                
-                Swal.fire({
-                    icon: "info",
-                    title: "Debe agregar tipo de cambio.",
-                    html: "<b class='color-red'></b>",
-                    showConfirmButton: true,
-                    timer: 1500
-                });
-                $('#grabarComprobante').css('visibility', 'visible');
-                $('img#loading').css('visibility', 'hidden');
-                return false;
-            }
-
             if ($('#almacen').val() == '') {
                 $("#almacen").focus();
-                
+                //alert("Debe seleccionar Moneda.");
                 Swal.fire({
                     icon: "info",
                     title: "No hay almacenes registrados.",
@@ -783,8 +832,11 @@ jQuery(document).ready(function () {
                 });
                 $('#grabarComprobante').css('visibility', 'visible');
                 $('img#loading').css('visibility', 'hidden');
+                $("#grabarComprobante").css("pointer-events", "auto");
                 return false;
             }
+
+      
 
             if (tipo_oper == 'V') {
                 //No hay asignado un cliente
@@ -799,9 +851,64 @@ jQuery(document).ready(function () {
                     });
                     $('#grabarComprobante').css('visibility', 'visible');
                     $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
 
+                if ( $('#caja').val()=='')
+                    {
+                        $("#caja").focus();
+                        
+                        Swal.fire
+                        (
+                            {
+                                icon: "info",
+                                title: "Debe elegir una caja o activar una caja",
+                                html: "<b class='color-red'></b>",
+                                showConfirmButton: true,
+                                timer: 1500
+                            }
+                        );
+                        
+                        $('#grabarComprobante').css('visibility', 'visible');
+                        $('img#loading').css('visibility', 'hidden');
+                        $("#grabarComprobante").css("pointer-events", "auto");
+
+                        return false;
+                    }
+
+                //MODIFICACIONES PARA QUE AL SELECCIONAR MULTIPLE SEA OBLIGRATORIO 
+                // PRESIONAR EL BOTON DE AGREGAR POR LO MENOS UNA VEZ 
+
+                  // Verificar si se debe mostrar la alerta de "Agregar"
+                if ($('#forma_pago').val()) {
+                    var currentText = document.getElementById('forma_pago').options[document.getElementById('forma_pago').selectedIndex].innerText.toLowerCase();
+                    var esMultiple = /multiple/g.test(currentText);
+
+                    // Si la opción es "multiple" y no se ha clickeado el botón "Agregar"
+                    if (esMultiple && !botonAgregarClickeado) {
+                        // Enfocar en el botón "Agregar"
+                        $("#openModalFormaPago").focus();
+
+                        // Mostrar alerta usando SweetAlert
+                        Swal.fire({
+                            icon: "info",
+                            title: "Debe presionar el botón +AGREGAR.",
+                            html: "<b class='color-red'></b>",
+                            showConfirmButton: true,
+                            timer: 1500
+                        });
+
+                        // Evitar el envío del formulario
+                        $('#grabarComprobante').css('visibility', 'visible');
+                        event.preventDefault();  // Detener el proceso
+                        $("#grabarComprobante").css("pointer-events", "auto");
+                        return;  // Asegúrate de detener la ejecución aquí
+                    }
+                }
+
+           ////////AQUI FINALIZA
+        
                 //NO FACTURA CON DNI
                 if ($("#tipocliente_doc").val()!="1" && tipo_docu=="F") {
                     Swal.fire({
@@ -813,6 +920,7 @@ jQuery(document).ready(function () {
                     });
                     $('#grabarComprobante').css('visibility', 'visible');
                     $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
 
@@ -837,6 +945,7 @@ jQuery(document).ready(function () {
                                     });
                                     $('#grabarComprobante').css('visibility', 'visible');
                                     $('img#loading').css('visibility', 'hidden');
+                                    $("#grabarComprobante").css("pointer-events", "auto");
                                     return false;
                                 }
 
@@ -854,6 +963,7 @@ jQuery(document).ready(function () {
                                     });
                                     $('#grabarComprobante').css('visibility', 'visible');
                                     $('img#loading').css('visibility', 'hidden');
+                                    $("#grabarComprobante").css("pointer-events", "auto");
                                     return false;
                                 }
                             }
@@ -871,71 +981,56 @@ jQuery(document).ready(function () {
                                 });
                                 $('#grabarComprobante').css('visibility', 'visible');
                                 $('img#loading').css('visibility', 'hidden');
+                                $("#grabarComprobante").css("pointer-events", "auto");
                                 return false;
                             }
                             
                         }
                     }
                 /*FIN PAGO AL CREDITO*/
+                var montoFP_default = parseFloat($('#montoFP_default').val());
+                var otherMontos = $('#tbFormasPago').find('tbody tr').find('.monto');
+                var total_FP = montoFP_default;
+                
+                $(otherMontos).each(function (i, item)
+                {
+                    if ($(item).val() > 0)
+                        total_FP += parseFloat($(item).val());
+                });
 
-                /*FOMRAS DE PAGO*/
-                    /*var montoFP_default = parseFloat($('#montoFP_default').val());
-                    var otherMontos = $('#tbFormasPago').find('tbody tr').find('.monto');
-                    var total_FP = montoFP_default;
-                    
-                    $(otherMontos).each(function (i, item)
-                    {
-                        if ($(item).val() > 0)
-                            total_FP += parseFloat($(item).val());
+                if (total_FP > parseFloat($('#importetotal').val()))
+                {
+                    Swal.fire({
+                        icon: "info",
+                        title: "Total de formas de pago es mayor al total.",
+                        html: "<b class='color-red'>Debe ser igual al importe del documento</b>",
+                        showConfirmButton: true,
+                        timer: 5000
                     });
+                    $("#forma_pago option[value=2]").attr("selected", true);
+                    $('#grabarComprobante').css('visibility', 'visible');
+                    $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
+                    return false;
+                }
 
-                    if (total_FP > parseFloat($('#importetotal').val()))
-                    {
-                        Swal.fire({
-                            icon: "info",
-                            title: "Total de formas de pago es mayor al total.",
-                            html: "<b class='color-red'>Debe ser igual al importe del documento</b>",
-                            showConfirmButton: true,
-                            timer: 5000
-                        });
-                        $("#forma_pago option[value=2]").attr("selected", true);
-                        $('#grabarComprobante').css('visibility', 'visible');
-                        $('img#loading').css('visibility', 'hidden');
-                        return false;
-                    }
+                if (total_FP < parseFloat($('#importetotal').val()))
+                {
+                    Swal.fire({
+                        icon: "info",
+                        title: "Total de formas de pago es menor al total.",
+                        html: "<b class='color-red'>Debe ser igual al importe del documento</b>",
+                        showConfirmButton: true,
+                        timer: 5000
+                    });
+                    $("#forma_pago option[value=2]").attr("selected", true);
+                    $('#grabarComprobante').css('visibility', 'visible');
+                    $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
+                    return false;
+                }
 
-                    if (total_FP < parseFloat($('#importetotal').val()))
-                    {
-                        Swal.fire({
-                            icon: "info",
-                            title: "Total de formas de pago es menor al total.",
-                            html: "<b class='color-red'>Debe ser igual al importe del documento</b>",
-                            showConfirmButton: true,
-                            timer: 5000
-                        });
-                        $("#forma_pago option[value=2]").attr("selected", true);
-                        $('#grabarComprobante').css('visibility', 'visible');
-                        $('img#loading').css('visibility', 'hidden');
-                        return false;
-                    }
-
-                    if (isNaN(montoFP_default))
-                    {
-                        Swal.fire({
-                            icon: "info",
-                            title: "Falta el monto de la forma de pago.",
-                            html: "<b class='color-red'>no debe estar en blanco</b>",
-                            showConfirmButton: true,
-                            timer: 5000
-                        });
-                        $("#forma_pago option[value=2]").attr("selected", true);
-                        $('#grabarComprobante').css('visibility', 'visible');
-                        $('img#loading').css('visibility', 'hidden');
-                        return false;
-                    }*/
-                /*FIN FORMAS DE PAGO*/
-
-
+            /*FIN FORMAS DE PAGO*/
             } else if (tipo_oper == 'C') {
 
                 if ($('#proveedor').val() == '') {
@@ -950,9 +1045,59 @@ jQuery(document).ready(function () {
                     });
                     $('#grabarComprobante').css('visibility', 'visible');
                     $('img#loading').css('visibility', 'hidden');
+                    $("#grabarComprobante").css("pointer-events", "auto");
                     return false;
                 }
+
+                if ( $('#caja').val()=='')
+                    {
+                        $("#caja").focus();
+                        
+                        Swal.fire
+                        (
+                            {
+                                icon: "info",
+                                title: "Debe elegir una caja o activarla.",
+                                html: "<b class='color-red'></b>",
+                                showConfirmButton: true,
+                                timer: 1500
+                            }
+                        );
+                        
+                        $('#grabarComprobante').css('visibility', 'visible');
+                        $('img#loading').css('visibility', 'hidden');
+                        $("#grabarComprobante").css("pointer-events", "auto");
+
+                        return false;
+                    }
+              
+                if ($('#forma_pago').val()) {
+                    var currentText = document.getElementById('forma_pago').options[document.getElementById('forma_pago').selectedIndex].innerText.toLowerCase();
+                    var esMultiple = /multiple/g.test(currentText);
+
+                    // Si la opción es "multiple" y no se ha clickeado el botón "Agregar"
+                    if (esMultiple && !botonAgregarClickeado) {
+                        // Enfocar en el botón "Agregar"
+                        $("#openModalFormaPago").focus();
+
+                        // Mostrar alerta usando SweetAlert
+                        Swal.fire({
+                            icon: "info",
+                            title: "Debe presionar el botón +AGREGAR.",
+                            html: "<b class='color-red'></b>",
+                            showConfirmButton: true,
+                            timer: 1500
+                        });
+
+                        // Evitar el envío del formulario
+                        $('#grabarComprobante').css('visibility', 'visible');
+                        event.preventDefault();  // Detener el proceso
+                        $("#grabarComprobante").css("pointer-events", "auto");
+                        return;  // Asegúrate de detener la ejecución aquí
+                    }
+                }
             }
+            
 
             if($("#moneda").val() > 2 && $("#tdcEuro").val() == "") {
                 $("#tdcEuro").focus();
@@ -980,6 +1125,7 @@ jQuery(document).ready(function () {
                 $("#forma_pago option[value=2]").attr("selected", true);
                 $('#grabarComprobante').css('visibility', 'visible');
                 $('img#loading').css('visibility', 'hidden');
+                $("#grabarComprobante").css("pointer-events", "auto");
                 return false;
             }
 
@@ -1023,6 +1169,7 @@ jQuery(document).ready(function () {
     	                        	document.getElementById(trTabla).style.background = "#ffadad";
     	                        	 $('#grabarComprobante').css('visibility', 'visible');
     	                             $('img#loading').css('visibility', 'hidden');
+    	                             $("#grabarComprobante").css("pointer-events", "auto");
     	                        	return false;
     		        			}
     	                    }
@@ -1030,6 +1177,7 @@ jQuery(document).ready(function () {
     	        		if(isSalir==true){
     	                	$('#grabarComprobante').css('visibility', 'visible');
     	        	       	$('img#loading').css('visibility', 'hidden');
+    	        	       	$("#grabarComprobante").css("pointer-events", "auto");
     	                	return false;
     	                }
     	        		
@@ -1044,6 +1192,7 @@ jQuery(document).ready(function () {
                     });
     	            $('#grabarComprobante').css('visibility', 'visible');
     	            $('img#loading').css('visibility', 'hidden');
+    	            $("#grabarComprobante").css("pointer-events", "auto");
     	            return ;
     	        }
                    
@@ -1057,13 +1206,14 @@ jQuery(document).ready(function () {
             } else {
                
                 if (codigo == '')
-                	 url = base_url + "index.php/ventas/comprobante/comprobante_insertar";
+                	 url = base_url + "index.php/ventas/comprobante/comprobante_insertar_ref";
                 else
                     url = base_url + "index.php/ventas/comprobante/comprobante_modificar";
                 
             }
 
             dataString = $('#frmComprobante').serialize();
+            
             $.ajax({
                 type: "POST",
                 url: url,
@@ -1077,10 +1227,11 @@ jQuery(document).ready(function () {
                     $('img#loading').css('visibility', 'hidden');
                     Swal.fire({
                                 icon: "error",
-                                title: "No se puedo completar la operación - Revise los campos ingresados.",
+                                title: "No se pudo completar la operación - Revise los campos ingresados.",
                                 showConfirmButton: false,
                                 timer: 2000
                             });
+                            $("#grabarComprobante").css("pointer-events", "auto");
                 },
                 success: function(data){
                     if ( codigo == "")
@@ -1107,8 +1258,11 @@ jQuery(document).ready(function () {
                                 title: titulo,
                                 showConfirmButton: true
                             }).then(function(){
-                                if (data.result == true)
-                                    location.href = base_url+"index.php/ventas/comprobante/comprobantes"+"/"+tipo_oper+"/"+tipo_docu;
+                                if (data.result) {
+                                    location.href = base_url + "index.php/ventas/comprobante/comprobantes" + "/" + tipo_oper + "/" + tipo_docu;
+                                } else {
+                                    $("#grabarComprobante").css("pointer-events", "auto"); // Rehabilitar la etiqueta si falla
+                                }
                             });
 
 

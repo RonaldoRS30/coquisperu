@@ -29,6 +29,422 @@ class Ventas extends Controller {
         $this->somevar['compania'] = $this->session->userdata('compania');
     }
     
+        public function ventasDiarias_pdf_cierre($fechaInicio, $fechaFin){
+        // Obtener datos de la sesión
+        $user = $this->session->userdata('user');
+        $compania = $this->somevar['compania'];
+        $empresa =$this->session->userdata('compania');
+        $caja_codigo = $this->session->userdata('caja_codigo');
+
+        //AGREGADO ALVAROHOY 6/11/2024
+
+        $totalesinmulti = $this->comprobante_formapago_model->ventasDiarioCTOTALUNI($fechaInicio, $fechaFin, $compania,$caja_codigo);
+
+            // Verifica si es un array y extrae los CPP_Codigo
+            $totaluni = [];
+            if (is_array($totalesinmulti) || is_object($totalesinmulti)) {
+                foreach ($totalesinmulti as $receiptsinmulti) {
+                    $totaluni[] = $receiptsinmulti->CPP_Codigo; // Extrae CPP_Codigo y lo agrega al array
+                }
+            }
+        ///AQUI FINALIZA ///
+
+        // Obtener datos de ventas
+        $dailySalesReceipt = $this->ventas_model->ventasDiarioC($fechaInicio, $fechaFin, $compania,$caja_codigo);
+
+            // Verifica si es un array y extrae los CPP_Codigo
+            $pruebas = [];
+            if (is_array($dailySalesReceipt) || is_object($dailySalesReceipt)) {
+                foreach ($dailySalesReceipt as $receipt) {
+                    $pruebas[] = $receipt->CPP_Codigo; // Extrae CPP_Codigo y lo agrega al array
+                }
+            }
+
+
+
+
+                     ////////esto fue lo ultimo que agregue.
+        /////////pruebas para notas de credito.
+
+        $notascredito = [];
+        if (is_array($dailySalesReceipt) || is_object($dailySalesReceipt)) {
+        foreach ($dailySalesReceipt as $ventanot) {
+           $notascredito [] = $ventanot->CPC_Serie . " - " . $ventanot->CPC_Numero;
+           }  
+            
+        }
+
+        ///////////////////////
+
+        $dailySalesNote = $this->ventas_model->ventasDiarioN($fechaInicio, $fechaFin, $compania, $notascredito);
+
+        //SE CAMBIO DE LOCACION DEL LA FUN VENTAS TOTAL AL ARCHIVO DE COMPROBANTE
+        $totalDaily = $this->comprobante_formapago_model->ventasTotal($fechaInicio, $fechaFin, $compania,$caja_codigo);
+    
+        
+
+
+        // Obtener información del usuario
+        $getDatosusuario = $this->usuario_model->getUsuario($user);
+        $usuario_nombre = isset($getDatosusuario[0]->PERSC_Nombre) ? $getDatosusuario[0]->PERSC_Nombre : 'Desconocido';
+
+        $getDatoscompania = $this->compania_model->listar_establecimiento($empresa);
+        $compania_nombre = isset($getDatoscompania[0]->EESTABC_Descripcion)? $getDatoscompania[0]->EESTABC_Descripcion : 'Desconocido';
+    
+        ///alvaro hoy 2:41 pm
+       // $pruebasalvaro = $this->comprobante_formapago_model->listacajamoviparapdf($fechaInicio, $fechaFin,$caja_codigo);
+
+        
+         // obtener informacion de ventas multiples .
+
+        $othersFormasP = $this->comprobante_formapago_model->getListcajacierre($pruebas);
+    
+
+        //obtener informacion de total de ventas multiples.
+        $totalformamulti = $this->comprobante_formapago_model->getListcajacierretablatotal($totaluni);
+
+        //alvaro 
+        $totalesCombinados = $this->comprobante_formapago_model->obtenerTotalesVentasUnificados($totaluni, $fechaInicio, $fechaFin, $compania, $caja_codigo);
+
+        // noviembre 20 alvaro
+        $totalesCombinadosefectivo = $this->comprobante_formapago_model->obtenerTotalesingresoefectivo($totaluni, $fechaInicio, $fechaFin, $compania, $caja_codigo);
+
+
+        // Configuración de TCPDF
+        $this->pdf = new pdfCaja('P', 'mm', 'A4', true, 'UTF-8', false);
+        $this->pdf->SetMargins(10, 35, 10);
+        
+        $this->pdf->setPrintHeader(true);
+        $this->pdf->SetFont('helvetica', '', 8);
+        $this->pdf->AddPage();
+        $this->pdf->SetAutoPageBreak(true, 30);
+        // Título del informe
+        $html = '<h1 style="text-align: center;">Registro de ingreso de caja</h1><br>';
+    
+        // Información de generación
+        $fecha_generacion = date("d-m-Y H:i:s");
+        $html .= '
+            <table cellpadding="4" cellspacing="0" border="0">
+                <tr>
+                    <td><strong>Fecha de Generación:</strong>
+                    ' . $fecha_generacion . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Sucursal:</strong>
+                    ' . $compania_nombre . '</td>
+                </tr>
+            </table>
+            <br><hr><br>
+        ';
+    
+        // Tabla de Ventas 
+        $html .= '<h2>Ventas </h2>';
+        $html .= '
+            <table border="1" cellpadding="4" cellspacing="0">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th width="25%" align="center"><strong>N° Comprobante</strong></th>
+                        <th width="25%" align="center"><strong>Monto (S/)</strong></th>
+                        <th width="25%" align="center"><strong>Método Pago</strong></th>
+                        <th width="25%" align="center"><strong>Estado</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+        ';
+    
+        foreach ($dailySalesReceipt as $venta) {
+            $numero_comprobante = utf8_encode($venta->CPC_Serie . "-" . $venta->CPC_Numero);
+            $monto = number_format($venta->CPC_total, 2) . " S/";
+            $metodo_pago = utf8_encode($venta->FORPAC_Descripcion);
+            $estado = utf8_encode($venta->Estado);
+            $tipooperacion = utf8_encode($venta->TipoOperacion);
+            $estadotiporeacion = utf8_encode($venta->TipoOperacion . "-" .$venta->Estado);
+            // Asignar color en función del valor de estado
+            $color = '';
+
+            // Asignar color en función de las combinaciones de estado y tipo de operación
+            if ($estado == "Aprobado" && $tipooperacion == "Ingreso") {
+                $color = 'color: green;';
+            } elseif ($estado == "Aprobado" && $tipooperacion == "Egreso") {
+                $color = 'color: orange;'; // Ejemplo: otro color para esta combinación
+            } elseif ($estado == "Anulado") {
+                $color = 'color: red;';
+            } elseif ($estado == "Denegado") {
+                $color = 'color: gray;';
+            } 
+    
+            $html .= '
+                <tr>
+                    <td align="center">' . $numero_comprobante . '</td>
+                    <td align="center">' . $monto . '</td>
+                    <td align="center">' . $metodo_pago . '</td>
+                    <td align="center" style="' . $color . '">' . $estadotiporeacion . '</td>
+                </tr>
+            ';
+        }
+    
+        $html .= '</tbody></table><br>';
+
+
+        
+
+                // Tabla de Ventas multi
+             // Tabla de Formas de Pago
+                    $html .= '<h2>Ventas Multiples</h2>';
+                    $html .= '
+                        <table border="1" cellpadding="4" cellspacing="0">
+                            <thead>
+                                <tr style="background-color: #f2f2f2;">
+                                      <th width="20%" align="center"><strong>N° Comprobante</strong></th>
+                                      <th width="20%" align="center"><strong>N° Orden</strong></th>
+                                      <th width="20%" align="center"><strong>Monto (S/)</strong></th>
+                                      <th width="20%" align="center"><strong>Método Pago</strong></th>
+                                      <th width="20%" align="center"><strong>Estado</strong></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    ';
+
+    
+
+                    // Filas para los métodos de pago adicionales
+                    if (count($othersFormasP) > 0) {
+                        foreach ($othersFormasP as $others) {
+
+
+                            $html .= '
+                                <tr>
+                                    <td align="center">'. strtoupper($others->CPC_Serie."-".$others->CPC_Numero).'</td>
+                                    <td align="center">' .strtoupper($others->idcji_compro_forPa) . '</td>
+                                    <td align="center">' . $others->MONED_Simbolo .number_format($others->monto, 2). '</td>
+                                    <td align="center">' .  strtoupper($others->FORPAC_Descripcion) . '</td>
+                                    <td align="center" style="color: blue;"><strong>Adicional</strong></td>
+                                </tr>
+                            ';
+                        }
+                    }
+
+                    $html .= '</tbody></table><br>';
+
+
+
+                    ///////
+                      // Tabla de  Total Ventas multi
+    
+                      $html .= '<h2>Total Ventas Múltiples</h2>';
+                      $html .= '
+                      <table border="1" cellpadding="4" cellspacing="0">
+                          <thead>
+                              <tr style="background-color: #f2f2f2;">
+                                  <th width="50%" align="center"><strong>Descripción</strong></th>
+                                  <th width="50%" align="center"><strong>Total (S/)</strong></th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                      ';
+                      
+                      // Filas para los métodos de pago adicionales
+                      $total_general = 0; // Inicializa el total general
+                      foreach ($totalformamulti as $totalItems) {
+                          $descripcion = utf8_encode($totalItems->descripcion); // Usa la descripción desde el modelo
+                          $monto_total = number_format($totalItems->monto_total, 2) . " S/"; // Usa el monto total desde el modelo
+                          $total_general += $totalItems->monto_total; // Acumular el total
+                      
+                          $html .= '
+                              <tr>
+                                  <td align="center">' . $descripcion . '</td>
+                                  <td align="center">' . $monto_total . '</td>
+                              </tr>
+                          ';
+                      }
+                      
+                      // Fila para el Total General
+                      $html .= '
+                          <tr style="background-color: #f2f2f2;">
+                              <td align="center"><strong>Total General</strong></td>
+                              <td align="center"><strong>' . number_format($total_general, 2) . ' S/</strong></td>
+                          </tr>
+                      ';
+                      
+                      $html .= '</tbody></table><br>';
+                      
+
+    
+
+      // Tabla de Notas de Crédito
+      $html .= '<h2>Notas de Crédito</h2>';
+      $html .= '
+          <table border="1" cellpadding="4" cellspacing="0">
+              <thead>
+                  <tr style="background-color: #f2f2f2;">
+                      <th width="25%" align="center"><strong>N° Nota Crédito</strong></th>
+                      <th width="25%" align="center"><strong>Monto (S/)</strong></th>
+                      <th width="25%" align="center"><strong>Método Pago</strong></th>
+                      <th width="25%" align="center"><strong>Estado</strong></th>
+                  </tr>
+              </thead>
+              <tbody>
+      ';
+  
+      foreach ($dailySalesNote as $nota) {
+          $numero_nota = utf8_encode($nota->CRED_Serie . "-" . $nota->CRED_Numero);
+          $monto_nota = number_format($nota->CRED_total, 2) . " S/";
+          $metodo_pago_nota = utf8_encode($nota->FORPAC_Descripcion);
+          $estado_nota = utf8_encode($nota->Estado);
+  
+          $html .= '
+              <tr>
+                  <td align="center">' . $numero_nota . '</td>
+                  <td align="center">' . $monto_nota . '</td>
+                  <td align="center">' . $metodo_pago_nota . '</td>
+                  <td align="center" style="color: orange;">' . $estado_nota . '</td>
+              </tr>
+          ';
+      }
+  
+      $html .= '</tbody></table><br>';
+        
+
+      //////pruebas hoy miercoles 20 de noviembre 
+            // Tabla de Notas de Crédito
+            $html .= '<h2>Resumen total de efectivo</h2>';
+            $html .= '
+            <table border="1" cellpadding="4" cellspacing="0">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th width="50%" align="center"><strong>Descripción</strong></th>
+                        <th width="50%" align="center"><strong>Total (S/)</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+            ';
+            $total_general = 0;
+
+            // Filas para los métodos de pago adicionales
+            foreach ($totalesCombinadosefectivo as $item) {
+                $descripcion = htmlspecialchars($item->descripcion);
+                $monto_total = number_format($item->monto_total, 2);
+                $total_general += $item->monto_total;
+                if (strpos($descripcion, '(EGRESO)') !== false) {
+                    $colorFondo = 'background-color: rgb(255, 102, 102);'; // Fondo rojo para EGRESO
+                } elseif (strpos($descripcion, 'Caja Inicial') !== false) {
+                    $colorFondo = 'background-color: rgb(204, 229, 255);'; // Fondo azul claro para CAJA INICIAL
+                } elseif (strpos($descripcion, 'Caja Egreso') !== false) {
+                    $colorFondo = 'background-color: rgb(220, 20, 60);'; // Fondo azul claro para CAJA INICIAL
+                }else {
+                    $colorFondo = ''; // Sin color de fondo para otros casos
+                }
+                $html .= '
+                    <tr style="' . $colorFondo . '">
+                        <td align="center">' . $descripcion . '</td>
+                        <td align="center">' . $monto_total . ' S/</td>
+                    </tr>
+                ';
+            }
+                    // Fila para el Total General
+            $html .= '
+            <tr style="background-color: #f2f2f2;">
+                <td align="center"><strong>Total General</strong></td>
+                <td align="center"><strong>' . number_format($total_general, 2) . ' S/</strong></td>
+            </tr>
+        ';
+        
+
+        
+            $html .= '</tbody></table><br>';
+    
+        // Tabla de Totales
+       /* $html .= '<h2>Total</h2>';
+        $html .= '
+            <table border="1" cellpadding="4" cellspacing="0">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th width="50%" align="center"><strong>Descripción</strong></th>
+                        <th width="50%" align="center"><strong>Total (S/)</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+        ';
+    
+        $total_general = 0;
+        foreach ($totalDaily as $totalItem) {
+            $descripcion = utf8_encode($totalItem->FORPAC_Descripcion);
+            $monto_total = number_format($totalItem->Total, 2) . " S/";
+            $total_general += $totalItem->Total;
+    
+            $html .= '
+                <tr>
+                    <td align="center">' . $descripcion . '</td>
+                    <td align="center">' . $monto_total . '</td>
+                </tr>
+            ';
+        }
+    
+        // Fila de Total General
+        $html .= '
+                <tr>
+                    <td align="center"><strong>TOTAL</strong></td>
+                    <td align="center"><strong>' . number_format($total_general, 2) . ' S/</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        ';
+        */
+        //ALVARO
+
+        $html .= '<h2>Resumen Unificado de Ventas Totales</h2>';
+        $html .= '
+        <table border="1" cellpadding="4" cellspacing="0">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th width="50%" align="center"><strong>Descripción</strong></th>
+                    <th width="50%" align="center"><strong>Total (S/)</strong></th>
+                </tr>
+            </thead>
+            <tbody>
+        ';
+        $total_general = 0;
+
+        // Filas para los métodos de pago adicionales
+        foreach ($totalesCombinados as $item) {
+            $descripcion = htmlspecialchars($item->descripcion);
+            $monto_total = number_format($item->monto_total, 2);
+            $total_general += $item->monto_total;
+            if (strpos($descripcion, '(EGRESO)') !== false) {
+                $colorFondo = 'background-color: rgb(255, 102, 102);'; // Fondo rojo para EGRESO
+            } elseif (strpos($descripcion, 'Caja Inicial') !== false) {
+                $colorFondo = 'background-color: rgb(204, 229, 255);'; // Fondo azul claro para CAJA INICIAL
+            } elseif (strpos($descripcion, 'Caja Egreso') !== false) {
+                $colorFondo = 'background-color: rgb(220, 20, 60);'; // Fondo azul claro para CAJA INICIAL
+            }else {
+                $colorFondo = ''; // Sin color de fondo para otros casos
+            }
+            $html .= '
+                <tr style="' . $colorFondo . '">
+                    <td align="center">' . $descripcion . '</td>
+                    <td align="center">' . $monto_total . ' S/</td>
+                </tr>
+            ';
+        }
+
+        
+        // Fila para el Total General
+        $html .= '
+            <tr style="background-color: #f2f2f2;">
+                <td align="center"><strong>Total General</strong></td>
+                <td align="center"><strong>' . number_format($total_general, 2) . ' S/</strong></td>
+            </tr>
+        ';
+        
+        $html .= '</tbody></table><br>';
+    
+        // Escribir el HTML en el PDF
+        $this->pdf->writeHTML($html, true, false, true, false, '');
+    
+        // Salida del PDF
+        $this->pdf->Output("Caja_de_ingreso" . date("Ymd_His") . ".pdf", 'I');
+    }
+    
     public function excel_producto_por_vendedor($vendedor = "", $fechai = NULL, $fechaf = NULL)
     {
             $fechaI = explode("-", $fechai);

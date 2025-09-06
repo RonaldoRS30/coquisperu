@@ -10,8 +10,9 @@ class Caja extends Controller{
     public function __construct(){
         parent::__construct();
 
-        $this->load->helper('form');
+		$this->load->helper('form');
         $this->load->helper('date');
+
         
         $this->load->model('maestros/proyecto_model');
         $this->load->model('maestros/directivo_model');
@@ -21,13 +22,19 @@ class Caja extends Controller{
 
         $this->load->model('tesoreria/banco_model');
         $this->load->model('tesoreria/caja_model');
+		$this->load->model('tesoreria/cajacierre_model');
         $this->load->model('tesoreria/tipocaja_model');
 
+		$this->load->model('tesoreria/movimiento_model');
         $this->load->model('ventas/cliente_model');
         $this->load->model('seguridad/usuario_model');
+		$this->load->model('seguridad/usuario_compania_model');
+		$this->load->library('movimientos');
+
         
         $this->load->library('html');
         $this->load->library('pagination');
+		$this->load->library('lib_props');
         $this->load->library('layout','layout');
         
         $this->empresa = $this->session->userdata('empresa');
@@ -44,79 +51,104 @@ class Caja extends Controller{
     ###### FUNCTIONS NEWS
     #########################
 
-        public function cajas(){
-            $data['base_url'] = $this->url;
+           public function cajas(){
+			$data['base_url'] = $this->url;
             $data['titulo_busqueda'] = "BUSCAR CAJAS";
             $data['titulo'] = "RELACIÓN DE CAJAS";
-
             $data['tipo_caja'] = $this->tipocaja_model->getTipoCajas();
-            
+			$data['scripts'] = $this->view_js;
+			$data['rolusu']  = $this->session->userdata('rol');
+			$data['cajeros'] =  $this->lib_props->listarVendedores();
+
             $this->layout->view('tesoreria/caja_index', $data);
         }
 
-        public function datatable_caja(){
+      public function datatable_caja(){
 
-            $columnas = array(
-                                0 => "",
-                                1 => "CAJA_Codigo",
-                                2 => "CAJA_Nombre",
-                                3 => "tipCa_Descripcion"
-                            );
-            
-            $filter = new stdClass();
-            $filter->start = $this->input->post("start");
-            $filter->length = $this->input->post("length");
-            $filter->search = $this->input->post("search")["value"];
 
-            $ordenar = $this->input->post("order")[0]["column"];
-            if ($ordenar != ""){
-                $filter->order = $columnas[$ordenar];
-                $filter->dir = $this->input->post("order")[0]["dir"];
-            }
+									$columnas = array(
+										0 => "",
+										1 => "CAJA_Codigo",
+										2 => "CAJA_Nombre",
+										3 => "tipCa_Descripcion"
+									);
 
-            $item = ($this->input->post("start") != "") ? $this->input->post("start") : 0;
+						$filter = new stdClass();
+						$filter->start = $this->input->post("start");
+						$filter->length = $this->input->post("length");
+						$filter->search = $this->input->post("search")["value"];
 
-            $filter->codigo = $this->input->post('codigo');
-            $filter->descripcion = $this->input->post('descripcion');
-            $filter->tipo = $this->input->post('tipo');
+						$ordenar = $this->input->post("order")[0]["column"];
+						if ($ordenar != ""){
+						$filter->order = $columnas[$ordenar];
+						$filter->dir = $this->input->post("order")[0]["dir"];
+						}
 
-            $cajaInfo = $this->caja_model->getCajas($filter);
-            $lista = array();
-            
-            if (count($cajaInfo) > 0) {
-                foreach ($cajaInfo as $indice => $valor) {
-                    $btn_modal = "<button type='button' onclick='editar($valor->CAJA_Codigo)' class='btn btn-default'>
-                                    <img src='".$this->url."/images/modificar.png' class='image-size-1b'>
-                                </button>";
+						$item = ($this->input->post("start") != "") ? $this->input->post("start") : 0;
 
-                    $btn_eliminar = "<button type='button' onclick='deshabilitar($valor->CAJA_Codigo)' class='btn btn-default'>
-                                    <img src='".$this->url."/images/documento-delete.png' class='image-size-1b'>
-                                </button>";
+						$filter->codigo = $this->input->post('codigo');
+						$filter->descripcion = $this->input->post('descripcion');
+						$filter->tipo = $this->input->post('tipo');
+						$cajaInfo = $this->caja_model->getCajas($filter);
+						$lista = array();
+						if (count($cajaInfo) > 0) {
 
-                    $lista[] = array(
-                                        0 => $indice + 1,
-                                        1 => $valor->CAJA_CodigoUsuario,
-                                        2 => $valor->CAJA_Nombre,
-                                        3 => $valor->tipCa_Descripcion,
-                                        4 => $valor->CAJA_Observacion,
-                                        5 => $btn_modal,
-                                        6 => $btn_eliminar
-                                    );
-                }
-            }
+						foreach ($cajaInfo as $indice => $valor) {
+							$btn_modal = "<button type='button' onclick='editar($valor->CAJA_Codigo)' class='btn btn-default'>
+											<img src='".$this->url."/images/modificar.png' class='image-size-1b'>
+										</button>";
 
-            unset($filter->start);
-            unset($filter->length);
+							$btn_eliminar = "<button type='button' onclick='deshabilitar($valor->CAJA_Codigo)' class='btn btn-default'>
+											<img src='".$this->url."/images/documento-delete.png' class='image-size-1b'>
+										</button>";
 
-            $json = array(
-                                "draw"            => intval( $this->input->post('draw') ),
-                                "recordsTotal"    => count($this->caja_model->getCajas()),
-                                "recordsFiltered" => intval( count($this->caja_model->getCajas($filter)) ),
-                                "data"            => $lista
-                        );
+							$msgEstado = ($valor->CAJA_FlagSituacion == '0') ? "<span class='bold color-red'style='display: block; text-align: center;'>CERRADA</span>" : 
+								"<span class='bold color-green 'style='display: block; text-align: center;'>ABIERTA</span>";
 
-            echo json_encode($json);
-        }
+								$rolusu = $this->session->userdata('rol');
+								$userid = $this->usuario = $this->session->userdata('user');
+
+
+								if($rolusu == 1 || $rolusu == 7000){
+									$lista[] = array(
+
+												0 => $indice + 1,
+												1 => $valor->CAJA_CodigoUsuario,
+												2 => $valor->CAJA_Nombre,
+												3 => $valor->tipCa_Descripcion,
+												4 => $msgEstado,
+												5 => $btn_modal,
+												6 => $btn_eliminar
+											);
+										}
+										else{
+											if($valor->CAJA_Usuario == $userid){
+												$lista[] = array(
+													0 => $indice + 1,
+													1 => $valor->CAJA_CodigoUsuario,
+													2 => $valor->CAJA_Nombre,
+													3 => $valor->tipCa_Descripcion,
+													4 => $msgEstado,
+													5 => $btn_modal,
+													6 => $btn_eliminar
+																);
+						}
+						}
+						}
+						}
+
+						unset($filter->start);
+						unset($filter->length);
+
+						$json = array(
+										"draw"            => intval( $this->input->post('draw') ),
+										"recordsTotal"    => count($this->caja_model->getCajas()),
+										"recordsFiltered" => intval( count($this->caja_model->getCajas($filter)) ),
+										"data"            => $lista
+								);
+
+						echo json_encode($json);
+		}
 
         public function getCaja(){
 
@@ -144,41 +176,76 @@ class Caja extends Controller{
             echo json_encode($json);
         }
 
-        public function guardar_registro(){
+     public function guardar_registro(){
 
-            $caja = $this->input->post("caja");
-            $codigo_caja = $this->input->post("codigo_caja");
-            $nombre_caja = $this->input->post("nombre_caja");
-            $tipo_caja = $this->input->post("tipo_caja");
-            $obs_caja = $this->input->post("obs_caja");
-            
-            $filter = new stdClass();
-            $filter->CAJA_CodigoUsuario = $codigo_caja;
-            $filter->CAJA_Nombre = strtoupper($nombre_caja);
-            $filter->CAJA_Observaciones = strtoupper($obs_caja);
-            $filter->tipCa_codigo = $tipo_caja;
-            $filter->CAJA_FlagEstado = "1";
-            $filter->COMPP_Codigo = $this->compania;
-            $filter->USUA_Codigo = $this->usuario;
+			$caja = $this->input->post("caja");
+			$codigo_caja = $this->input->post("codigo_caja");
+			$nombre_caja = $this->input->post("nombre_caja");
+			$tipo_caja = $this->input->post("tipo_caja");
+			$obs_caja = $this->input->post("obs_caja");
+			$estado_caja = $this->input->post("estado_caja");
+			$estado_caja_ant = $this->input->post("estado_caja_ant");
+			$cajero_caja = $this->input->post("cajero_caja");
+			
+			$validacion = false;        
 
-            if ($caja != ""){
-                $filter->CAJA_Codigo = $caja;
-                $filter->CAJA_FechaModificacion = date("Y-m-d H:i:s");
-                $result = $this->caja_model->actualizar_caja($caja, $filter);
-            }
-            else{
-                $filter->CAJA_FechaRegistro = date("Y-m-d H:i:s");
-                $result = $this->caja_model->insertar_caja($filter);
-            }
+			$cajero_caja = (int)$cajero_caja;
 
-            if ($result)
-                $json = array("result" => "success");
-            else
-                $json = array("result" => "error");
-            
-            echo json_encode($json);
-        }
+			$traerDatosUser = $this->usuario_model->getPersonaUsuario($cajero_caja);
+			$cajero = $traerDatosUser[0]->USUA_Codigo;
+			
+			$filter = new stdClass();
+			$filter->CAJA_CodigoUsuario = $codigo_caja;
+			$filter->CAJA_Nombre = strtoupper($nombre_caja);
+			$filter->CAJA_Observaciones = strtoupper($obs_caja);
+			$filter->tipCa_codigo = $tipo_caja;
+			$filter->CAJA_FlagEstado = "1";
+			$filter->COMPP_Codigo = $this->compania;
+			$filter->USUA_Codigo = $this->usuario;
+			$filter->CAJA_FlagSituacion = $estado_caja;//1 - Abierto,0 - Cerrada
+			$filter->CAJA_Usuario = $cajero;
 
+	
+			if ($caja == NULL && $codigo_caja != ""){
+	
+				$filter->CAJA_FechaRegistro = date("Y-m-d H:i:s");
+				$caja = $this->caja_model->insertar_caja($filter);            
+				
+				//Aperturamos caja
+				if($estado_caja == 1 && ($estado_caja_ant == 0 || $estado_caja_ant == NULL))
+					$rsapertura = $this->movimientos->apertura_caja($caja);
+	
+				if($caja)
+					$validacion = true;
+	
+			}
+			else{
+	
+				$filter->CAJA_FechaModificacion = date("Y-m-d H:i:s");
+				$rsactualizar = $this->caja_model->actualizar_caja($caja, $filter);
+	
+				//Aperturamos caja 
+				/* var_dump($estado_caja);
+				exit; */
+				if($estado_caja == 1 && $estado_caja_ant == 0){
+					$rsmov = $this->movimientos->apertura_caja($caja);
+				}
+				//Cerramos caja
+				elseif($estado_caja == 0 && $estado_caja_ant == 1){
+					$rsmov = $this->movimientos->cierre_caja($caja);
+				}
+	
+				if($rsactualizar)
+					$validacion = true;
+			}
+	
+			if ($validacion)
+				$json = array("result" => "success");
+			else
+				$json = array("result" => "error");
+	
+			echo json_encode($json);
+		}
         public function deshabilitar_caja(){
 
             $caja = $this->input->post("caja");
