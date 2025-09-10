@@ -3471,6 +3471,55 @@ if ($filter->tipo_oper=="V") {
         return array();
   }
   //FIN REPORTE POR CLIENTE
+
+
+  public function ventasDiarioC($fechaInicio, $fechaFin, $compania, $caja_codigo) {
+        $this->db->select('c.CPC_Serie, c.CPC_Numero, c.CPP_Codigo, c.CPC_total, f.FORPAC_Descripcion, CASE (c.CPC_FlagEstado) WHEN 2 THEN "Denegado" WHEN 0 THEN "Anulado" ELSE "Aprobado" END as Estado,
+        ,CASE WHEN c.CPC_TipoOperacion = "C" THEN "Egreso"  WHEN c.CPC_TipoOperacion = "V" THEN "Ingreso" ELSE "OTRO" END as TipoOperacion', FALSE);
+        $this->db->from('cji_comprobante as c');
+        $this->db->join('cji_formapago as f', 'c.FORPAP_Codigo = f.FORPAP_Codigo');
+        $this->db->where('c.COMPP_Codigo', $compania);
+        $this->db->where('c.CAJA_Codigo', $caja_codigo);
+        $this->db->where('c.CPC_FlagEstado !=', 2);
+                //SE AGREGO HOY MARTES
+
+       // $this->db->where('c.CPC_TipoOperacion !=', 'C');
+
+        // Filtra usando CPC_FechaModificacion si no está vacío, o CPC_FechaRegistro si lo está
+        $this->db->where("
+            CASE 
+                WHEN c.CPC_FechaModificacion IS NOT NULL THEN (c.CPC_FechaModificacion >= '$fechaInicio' AND c.CPC_FechaModificacion < '" . date('Y-m-d H:i:s', strtotime($fechaFin . ' + 1 minute')) . "')
+                ELSE (c.CPC_FechaRegistro >= '$fechaInicio' AND c.CPC_FechaRegistro < '" . date('Y-m-d H:i:s', strtotime($fechaFin . ' + 1 minute')) . "')
+            END
+        ", NULL, FALSE);
+
+        $response = $this->db->get();
+        return $response->result();
+    }
+
+    public function ventasDiarioN($fechaInicio, $fechaFin, $compania, $numero_combinado) {
+         // Retorna un array vacío si no se pasa un número válido
+        if (empty($numero_combinado)) {
+          return [];
+      }
+     
+        $this->db->select('n.CRED_Serie, n.CRED_Numero, n.CRED_total, f.FORPAC_Descripcion, CASE n.CRED_FlagEstado when 2 then "Denegado" ELSE "Aprobado" END as Estado', FALSE);
+        $this->db->from('cji_nota as n');
+        $this->db->join('cji_formapago as f', 'n.CRED_FormaPago = f.FORPAP_Codigo');
+        $this->db->where('n.COMPP_Codigo', $compania);
+        //$this->db->where('n.CRED_FechaRegistro >=', $fechaInicio);
+        //$this->db->where('n.CRED_FechaRegistro <', date('Y-m-d H:i:s', strtotime($fechaFin. ' + 1 minute')));
+        $this->db->where('n.CRED_FlagEstado !=', 2);
+        $this->db->where_in('n.CRED_NumeroInicio', $numero_combinado);
+
+        // Excluir documentos tipo F
+      
+        $response = $this->db->get();
+      
+        return $response->result();
+      }
+
+      
   
 }
 ?>

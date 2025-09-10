@@ -463,6 +463,7 @@ class Comprobante extends Controller{
                                 $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
                                 $filter->CAJAMOV_FlagEstado     = "1";
                                 $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
+                                $filter->CPP_Codigo = $comprobante->CPP_Codigo;
                                 $this->movimientos->guardar_movimiento($filter);
                             }
 
@@ -491,6 +492,7 @@ class Comprobante extends Controller{
                                         $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
                                         $filter->CAJAMOV_FlagEstado     = "1";
                                         $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
+                                        $filter->CPP_Codigo = $comprobante->CPP_Codigo;
                                         $this->movimientos->guardar_movimiento($filter);
                                     }else{
                                         switch ($comprobante->CPC_TipoDocumento) {
@@ -2019,7 +2021,8 @@ class Comprobante extends Controller{
             }
 
             $data['caja']               = "";
-            $data['cajas']              = $this->caja_model->getCajas();
+            // $data['cajas']              = $this->caja_model->getCajas();
+            $data['cajas']              = $this->caja_model->getCajasabiertas();
             $data["documentosNatural"]  = $this->tipodocumento_model->listar_tipo_documento();
             $data["documentosJuridico"] = $this->tipocodigo_model->listar_tipo_codigo();
             $data['afectaciones']       = $this->producto_model->tipo_afectacion();
@@ -3884,7 +3887,8 @@ class Comprobante extends Controller{
         $data['cboFormaPago']   = $this->OPTION_generador($this->formapago_model->listar(), 'FORPAP_Codigo', 'FORPAC_Descripcion', $forma_pago);
         $data['cboMoneda']      = $this->OPTION_generador($this->moneda_model->listar(), 'MONED_Codigo', 'MONED_Descripcion', $moneda);
         $data['cboVendedor']    = $this->lib_props->listarVendedores($vendedor);
-        $data['cajas']          = $this->caja_model->getCajas();
+        // $data['cajas']          = $this->caja_model->getCajas();
+        $data['cajas']          = $this->caja_model->getCajasabiertas();
         $data['caja']           = "$caja";
         $data['serie']          = $serie;
         $data['numero']         = $numero;

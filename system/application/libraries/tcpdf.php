@@ -509,4 +509,59 @@ class pdfGuiaRemision extends TCPDF {
     }
 }
 
+class pdfCaja extends TCPDF
+{
+    protected $ci;
+    private $ruc;
+    private $doc;
+    private $serie;
+    private $numero;
+    private $fondo;
+    private $compania;
+    private $empresa;
+    private $usuario;
+    private $persona;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ci =& get_instance();
+        $this->compania = $_SESSION["compania"];
+        $this->empresa = $_SESSION["empresa"];
+        $this->usuario = $_SESSION["usuario"];
+        $this->persona = $_SESSION["persona"];
+        $this->fondo = "images/img_db/comprobante_general_".$this->compania.".jpg";
+    }
+
+    public function Header( $flagPdf = 1 )
+    {
+        if ($flagPdf == 1)
+        {
+            $this->SetAutoPageBreak(false, 0);
+            //$this->Image($this->fondo, 0, 0, 210, 297, '', '', '', true, 300, '', false, false, 0);
+            $this->SetAutoPageBreak(true, 40);
+        }
+        $this->printHeaderData();
+    }
+
+    public function settingHeaderData($filter,$doc)
+    {
+        $this->ruc          = $filter->ruc;
+        $this->doc          = $doc;
+        $this->serie        = $filter->serie;
+        $this->numero       = $filter->numero;
+        $this->RazonSocial  = $filter->RazonSocial;
+        $this->direccion    = $filter->direccion;
+        $this->ubigeo       = $filter->ubigeo;
+    }
+
+    public function printHeaderData()
+    {    
+        $logo_empresa = base_url() . 'images/cabeceras/logo'.$this->empresa.'.png';
+        $this->Image($logo_empresa, 10, 9, 126, 26, '', '', '', false, 300);
+
+        $this->SetY(55);
+    }
+}
+
 ?>

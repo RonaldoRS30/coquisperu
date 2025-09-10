@@ -482,6 +482,33 @@ public function autocompleteCaja($keyword){
 	}
 }
 
+public function getCajasabiertas($filter = NULL) {
+
+            $limit = ( isset($filter->start) && isset($filter->length) ) ? " LIMIT $filter->start, $filter->length " : "";
+            $order = ( isset($filter->order) && isset($filter->dir) ) ? "ORDER BY $filter->order $filter->dir " : "";
+
+            $where = '';
+            if (isset($filter->codigo) && $filter->codigo != '')
+                $where .= " AND c.CAJA_Codigo = $filter->codigo";
+            
+            if (isset($filter->descripcion) && $filter->descripcion != '')
+                $where .= " AND c.CAJA_Nombre LIKE '%$filter->descripcion%'";
+
+            if (isset($filter->tipo) && $filter->tipo != '')
+                $where .= " AND c.tipCa_codigo = $filter->tipo";
+
+            $sql = "SELECT c.*, tp.tipCa_Descripcion
+                        FROM cji_caja c
+                        LEFT JOIN cji_tipocaja tp ON tp.tipCa_codigo = c.tipCa_codigo
+                        WHERE c.CAJA_FlagEstado LIKE '1' AND c.CAJA_FlagSituacion AND c.COMPP_Codigo = $this->compania $where $order $limit";
+
+            $query = $this->db->query($sql);
+            if ($query->num_rows > 0)
+                return $query->result();
+            else
+                return array();
+        }
+
 
   	}
 
