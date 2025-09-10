@@ -731,7 +731,7 @@
     });
  
 $(document).on('shown.bs.modal', function () {
-    $('#tempde_barcode').focus();
+    $('#tempde_producto').focus();
 });
 
     $("#linkVerVentasArticulo").click(function(){
@@ -1629,7 +1629,7 @@ $(document).on('shown.bs.modal', function () {
                     $("#tempde_message").show();
                     limpiar_campos_modal(); 
 
-                            $("#tempde_barcode").focus();
+                            $("#tempde_producto").focus();
 
                 }
                 else { alert("intentelo nuevamente.");}
@@ -1673,7 +1673,7 @@ $(document).on('shown.bs.modal', function () {
       // SOLO preparar el botón, NO ejecutar
                 $("#tempde_aceptar").attr("onclick", "agregar_productotemp_modificado(" + fila + ")");       
                              limpiar_campos_modal();
-                     $("#tempde_barcode").focus();
+                     $("#tempde_producto").focus();
                 }
                 else { 
                     alert("No se pudo modificar los datos");
