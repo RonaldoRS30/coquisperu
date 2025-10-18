@@ -81,6 +81,7 @@ class Comprobante extends Controller{
         $this->load->model('maestros/tipocambio_model');
         $this->load->model('maestros/tipodocumento_model');
         $this->load->model('maestros/tipocodigo_model');
+        $this->load->model('tesoreria/cajacierre_model');
 
         $this->load->model('ventas/tipocliente_model');
         $this->load->model('almacen/fabricante_model');
@@ -409,171 +410,209 @@ class Comprobante extends Controller{
         }
 
         public function disparador($tipo_oper = 'V', $codigo, $tipo_docu = 'F'){
-            $aceptada = false;
-            $lotesAsignados = true; # $this->verificar_lotes_asignados($codigo);
-            
-            $comprobanteInfo = $this->comprobante_model->obtener_comprobante($codigo);
-            $comprobante = $comprobanteInfo[0];
-            
-            if ($comprobante->CPC_FlagEstado == '2'){
+    $aceptada = false;
+    $lotesAsignados = true;
+    
+    $comprobanteInfo = $this->comprobante_model->obtener_comprobante($codigo);
+    $comprobante = $comprobanteInfo[0];
+    
+    if ($comprobante->CPC_FlagEstado == '2'){
 
-                if ($comprobante->CPC_TipoDocumento == "F" || $comprobante->CPC_TipoDocumento == "B"){
-                    $aceptada = $this->envioSunatFac($codigo, $comprobante);
-                }
+        if ($comprobante->CPC_TipoDocumento == "F" || $comprobante->CPC_TipoDocumento == "B"){
+            $aceptada = $this->envioSunatFac($codigo, $comprobante);
+        }
 
-                if ($aceptada["exito"] == true || $comprobante->CPC_TipoDocumento == 'N'){
-                    $this->confirmInventariado($codigo);
-                    if ($comprobante->CPC_FlagMueveStock == '0') {
-                        
-                        $this->db->trans_start();
-                        $query = $this->db->query("CALL COMPROBANTE_DISPARADOR($codigo)");
-                        
-                        if($this->db->trans_status() == false){
-                            $this->db->trans_rollback();
-                            $success = array( "result" => "error", "response" => "Intente nuevamente! De persistir el inconveniente, contacte al administrador." );
-                        }else{
+        if ($aceptada["exito"] == true || $comprobante->CPC_TipoDocumento == 'N'){
+            $this->confirmInventariado($codigo);
 
-                            if ($comprobante->CPC_TipoOperacion == 'V') {
-                                $movimiento = $this->disminuir_stock($comprobante);
-                            }else{
-                                $movimiento = $this->aumentar_stock($comprobante);
-                            }
-                            
-                            $this->db->trans_commit(); 
-                            $success = array( "result" => "success" ,"response" => $aceptada["msj"],"serie"=>$comprobante->CPC_Serie,"numero"=>$comprobante->CPC_Numero,"total"=>$comprobante->CPC_total);
+            if ($comprobante->CPC_FlagMueveStock == '0') {
+                
+                $this->db->trans_start();
+                $query = $this->db->query("CALL COMPROBANTE_DISPARADOR($codigo)");
+                
+                if($this->db->trans_status() == false){
+                    $this->db->trans_rollback();
+                    $success = array( "result" => "error", "response" => "Intente nuevamente! De persistir el inconveniente, contacte al administrador." );
+                }else{
 
-                            # SI UNA CAJA ESTA ASOCIADA AL DOCUMENTO, REGISTRA EL MOVIMIENTO EN LA CAJA
-                            
-                            if ($comprobante->CAJA_Codigo != "" && $comprobante->CAJA_Codigo != NULL && $comprobante->FORPAP_Codigo == 1){
-                                $cuenta = $this->cuentas_model->getCuentaComprobante($codigo);
-                                $justification = ($comprobante->CPC_TipoOperacion == "V") ? "INGRESO POR VENTA " : "EGRESO POR COMPRA ";
-                                $justification = $justification . $comprobante->CPC_Serie . " - " . $this->lib_props->getOrderNumeroSerie($comprobante->CPC_Numero);
+                    if ($comprobante->CPC_TipoOperacion == 'V') {
+                        $movimiento = $this->disminuir_stock($comprobante);
+                    }else{
+                        $movimiento = $this->aumentar_stock($comprobante);
+                    }
+                    
+                    $this->db->trans_commit(); 
+                    $success = array( 
+                        "result" => "success",
+                        "response" => $aceptada["msj"],
+                        "serie"=>$comprobante->CPC_Serie,
+                        "numero"=>$comprobante->CPC_Numero,
+                        "total"=>$comprobante->CPC_total
+                    );
+
+                    ###############################################
+                    # REGISTRO DE MOVIMIENTOS SEGÚN FORMAS DE PAGO
+                    ###############################################
+
+                    $formas2pay = $this->comprobante_formapago_model->getList($codigo);
+
+                    // guardamos el id de cierre que se vaya generando (último)
+                    $id_cierre = null;
+
+                    if ($formas2pay) {
+                        $cuenta = $this->cuentas_model->getCuentaComprobante($codigo);
+
+                        foreach ($formas2pay as $value) {
+                            $formapago2 = $value->FORPAP_Codigo;
+                            $montopago2 = $value->monto;
+
+                            // Si existe caja asociada -> registrar movimiento de caja por la forma de pago (monto parcial)
+                            if (!empty($comprobante->CAJA_Codigo)) {
+                                $justification = ($comprobante->CPC_TipoOperacion == "V")
+                                    ? "INGRESO POR VENTA "
+                                    : "EGRESO POR COMPRA ";
+                                $justification .= $comprobante->CPC_Serie . " - " . $this->lib_props->getOrderNumeroSerie($comprobante->CPC_Numero);
+
                                 $filter = new stdClass();
-                                $filter->CAJAMOV_Codigo         = ""; # "" PARA INGRESAR UN REGISTRO NUEVO
-                                $filter->CAJA_Codigo            = $comprobante->CAJA_Codigo;
-                                $filter->PAGP_Codigo            = NULL;
-                                $filter->RESPMOV_Codigo         = NULL;
-                                $filter->CUENT_Codigo           = $cuenta[0]->CUE_Codigo;
-                                $filter->MONED_Codigo           = $comprobante->MONED_Codigo;
-                                $filter->CAJAMOV_Monto          = $comprobante->FORPAP_Monto;
-                                $filter->CAJAMOV_MovDinero      = ($comprobante->CPC_TipoOperacion == 'V') ? 1 : 2; # (V:1) = INGRESO | (C:2) = EGRESO
-                                $filter->FORPAP_Codigo          = $comprobante->FORPAP_Codigo;
-                                $filter->CAJAMOV_FechaRecep     = $comprobante->CPC_Fecha;
-                                $filter->CAJAMOV_Justificacion  = $justification;
-                                $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
-                                $filter->CAJAMOV_FlagEstado     = "1";
-                                $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
-                                $filter->CPP_Codigo = $comprobante->CPP_Codigo;
-                                $this->movimientos->guardar_movimiento($filter);
-                            }
+                                $filter->CAJAMOV_Codigo        = "";
+                                $filter->CAJA_Codigo           = $comprobante->CAJA_Codigo;
+                                $filter->PAGP_Codigo           = NULL;
+                                $filter->RESPMOV_Codigo        = NULL;
+                                $filter->CUENT_Codigo          = $cuenta[0]->CUE_Codigo;
+                                $filter->MONED_Codigo          = $value->MONED_Codigo;
+                                $filter->CAJAMOV_Monto         = $montopago2; // monto parcial por forma de pago
+                                $filter->CAJAMOV_MovDinero     = ($comprobante->CPC_TipoOperacion == 'V') ? 1 : 2;
+                                $filter->FORPAP_Codigo         = $formapago2;
+                                $filter->CAJAMOV_FechaRecep    = $comprobante->CPC_Fecha;
+                                $filter->CAJAMOV_Justificacion = $justification;
+                                $filter->CAJAMOV_Observacion   = $comprobante->CPC_Observacion;
+                                $filter->CAJAMOV_FlagEstado    = "1";
+                                $filter->CAJAMOV_CodigoUsuario = $this->usuario;
+                                $filter->CPP_Codigo            = $comprobante->CPP_Codigo;
 
-                            ###############################################
-                            $formas2pay  = $this->comprobante_formapago_model->getList($codigo);
-                            if ($formas2pay) {
-                                $cuenta = $this->cuentas_model->getCuentaComprobante($codigo);
-                                foreach ($formas2pay as $key => $value) {
-                                    $formapago2     = $value->FORPAP_Codigo;
-                                    $montopago2     = $value->monto;
-                                    if ($comprobante->CAJA_Codigo != "" && $comprobante->CAJA_Codigo != NULL && $formapago2 == 1){
-                                        $justification = ($comprobante->CPC_TipoOperacion == "V") ? "INGRESO POR VENTA " : "EGRESO POR COMPRA ";
-                                        $justification = $justification . $comprobante->CPC_Serie . " - " . $this->lib_props->getOrderNumeroSerie($comprobante->CPC_Numero);
-                                        $filter = new stdClass();
-                                        $filter->CAJAMOV_Codigo         = ""; # "" PARA INGRESAR UN REGISTRO NUEVO
-                                        $filter->CAJA_Codigo            = $comprobante->CAJA_Codigo;
-                                        $filter->PAGP_Codigo            = NULL;
-                                        $filter->RESPMOV_Codigo         = NULL;
-                                        $filter->CUENT_Codigo           = $cuenta[0]->CUE_Codigo;
-                                        $filter->MONED_Codigo           = $value->MONED_Codigo;
-                                        $filter->CAJAMOV_Monto          = $montopago2;
-                                        $filter->CAJAMOV_MovDinero      = ($comprobante->CPC_TipoOperacion == 'V') ? 1 : 2; # (V:1) = INGRESO | (C:2) = EGRESO
-                                        $filter->FORPAP_Codigo          = $formapago2;
-                                        $filter->CAJAMOV_FechaRecep     = $comprobante->CPC_Fecha;
-                                        $filter->CAJAMOV_Justificacion  = $justification;
-                                        $filter->CAJAMOV_Observacion    = $comprobante->CPC_Observacion;
-                                        $filter->CAJAMOV_FlagEstado     = "1";
-                                        $filter->CAJAMOV_CodigoUsuario  = $this->usuario;
-                                        $filter->CPP_Codigo = $comprobante->CPP_Codigo;
-                                        $this->movimientos->guardar_movimiento($filter);
-                                    }else{
-                                        switch ($comprobante->CPC_TipoDocumento) {
-                                            case 'F': $codtipodocu  = '8';
-                                                break;
-                                            case 'B': $codtipodocu  = '9';
-                                                break;
-                                            case 'N': $codtipodocu  = '14';
-                                                break;
-                                            default: $codtipodocu   = '0';
-                                                break;
-                                        }
+                                // registra movimiento en cji_cajamovimiento
+                                $this->movimientos->guardar_movimiento_cpp($filter);
 
-                                        $filter2 = new stdClass();
-                                        $filter2->CUE_TipoCuenta    = $comprobante->CPC_TipoOperacion == 'V' ? 1 : 2;
-                                        $filter2->DOCUP_Codigo      = $codtipodocu;
-                                        $filter2->CUE_CodDocumento  = $codigo;
-                                        $filter2->MONED_Codigo      = $value->MONED_Codigo;
-                                        $filter2->CUE_Monto         = $value->monto;
-                                        $filter2->CUE_FechaOper     = $comprobante->CPC_Fecha;
-                                        $filter2->COMPP_Codigo      = $comprobante->COMPP_Codigo;
-                                        $filter2->CUE_FlagEstado    = '1';
-                                        if ($value->FORPAP_Codigo == 1) {
-                                            $filter2->CUE_FlagEstadoPago = 'C';
-                                        }
-                                        $cuenta = $this->cuentas_model->insertar($filter2);
-                                        #Ingreso de pago automatico si es efectivo
-                                        if ($value->FORPAP_Codigo == 1) {  //Si el pago es al contado           
-                                            $filter3 = new stdClass();
-                                            $filter3->PAGC_TipoCuenta   = $comprobante->CPC_TipoOperacion == 'V' ? 1 : 2;
-                                            $filter3->PAGC_FechaOper    = $comprobante->CPC_Fecha;
-                                            
-                                            if ($filter3->PAGC_TipoCuenta == 1)
-                                                $filter3->CLIP_Codigo = $comprobante->CLIP_Codigo;
-                                            else
-                                                $filter3->PROVP_Codigo = $comprobante->PROVP_Codigo;
-                                            
-                                            $tdc = $comprobante->CPC_TDC;
+                                // actualizar cierre de caja con el monto parcial
+                                $id_caja = $comprobante->CAJA_Codigo;
+                                $ultima_Caja = $this->cajacierre_model->get_ultimo_Cierre($id_caja);
 
-                                            $filter3->PAGC_TDC          = $tdc;
-                                            $filter3->PAGC_Monto        = $montopago2;
-                                            $filter3->MONED_Codigo      = $value->MONED_Codigo;
-                                            $filter3->PAGC_FormaPago    = $value->FORPAP_Codigo; //Efectivo
+                                if ($ultima_Caja && isset($ultima_Caja[0])) {
+                                    $id_cierre = $ultima_Caja[0]->CAJCIERRE_Codigo;
 
-                                            $filter3->PAGC_Obs = ($comprobante->CPC_TipoOperacion == 'V' ? 'INGRESO GENERADO' : 'SALIDA GENERADA') . ' AUTOMATICAMENTE POR EL PAGO AL CONTADO';
-                                            $filter3->PAGC_Saldo = '0';
+                                    if ($tipo_oper == "V") {
+                                        $monto_actual_ingresos = $ultima_Caja[0]->CAJCIERRE_Ingresos;
+                                        $nuevo_monto_ingresos = $monto_actual_ingresos + $montopago2;
 
-                                            $cod_pago = $this->pago_model->insertar($filter3, '', '', '');
+                                        $cierre_update = new stdClass();
+                                        $cierre_update->CAJCIERRE_Ingresos = $nuevo_monto_ingresos;
+                                        $this->cajacierre_model->actualizar_cierre($id_cierre, $cierre_update);
+                                    } else {
+                                        $monto_actual_egresos = $ultima_Caja[0]->CAJCIERRE_Egresos;
+                                        $nuevo_monto_egresos = $monto_actual_egresos + $montopago2;
 
-                                            $filter5 = new stdClass();
-                                            $filter5->CUE_Codigo    = $cuenta;
-                                            $filter5->PAGP_Codigo   = $cod_pago;
-                                            $filter5->CPAGC_TDC     = $tdc;
-                                            $filter5->CPAGC_Monto   = $montopago2;
-                                            $filter5->MONED_Codigo  = $value->MONED_Codigo;
-
-                                            $this->cuentaspago_model->insertar($filter5);
-                                            $filter3 = new stdClass();
-                                        }
+                                        $cierre_update = new stdClass();
+                                        $cierre_update->CAJCIERRE_Egresos = $nuevo_monto_egresos;
+                                        $this->cajacierre_model->actualizar_cierre($id_cierre, $cierre_update);
                                     }
+
+                                    // Recalcular saldo
+                                    $actualizado_Caja = $this->cajacierre_model->get_ultimo_Cierre($id_caja);
+                                    $total_ingresos = $actualizado_Caja[0]->CAJCIERRE_Ingresos;
+                                    $total_egresos  = $actualizado_Caja[0]->CAJCIERRE_Egresos;
+                                    $saldo = $total_ingresos - $total_egresos;
+
+                                    $cierre_actualizado = new stdClass();
+                                    $cierre_actualizado->CAJCIERRE_Saldo = $saldo;
+                                    $this->cajacierre_model->actualizar_cierre($id_cierre, $cierre_actualizado);
                                 }
                             }
-                            ###############################################
-                        }
-                    }else{
+
+                            // Registro contable y pago automático (cuando no hay caja o adicionalmente)
+                            // (Se mantiene la lógica existente para cuentas y pagos)
+                            switch ($comprobante->CPC_TipoDocumento) {
+                                case 'F': $codtipodocu = '8'; break;
+                                case 'B': $codtipodocu = '9'; break;
+                                case 'N': $codtipodocu = '14'; break;
+                                default:  $codtipodocu = '0'; break;
+                            }
+
+                            $filter2 = new stdClass();
+                            $filter2->CUE_TipoCuenta    = $comprobante->CPC_TipoOperacion == 'V' ? 1 : 2;
+                            $filter2->DOCUP_Codigo      = $codtipodocu;
+                            $filter2->CUE_CodDocumento  = $codigo;
+                            $filter2->MONED_Codigo      = $value->MONED_Codigo;
+                            $filter2->CUE_Monto         = $montopago2;
+                            $filter2->CUE_FechaOper     = $comprobante->CPC_Fecha;
+                            $filter2->COMPP_Codigo      = $comprobante->COMPP_Codigo;
+                            $filter2->CUE_FlagEstado    = '1';
+                            if ($formapago2 == 1) {
+                                $filter2->CUE_FlagEstadoPago = 'C';
+                            }
+                            $cuenta_insertada = $this->cuentas_model->insertar($filter2);
+
+                            if ($formapago2 == 1) { // Efectivo -> pago automático
+                                $filter3 = new stdClass();
+                                $filter3->PAGC_TipoCuenta   = $comprobante->CPC_TipoOperacion == 'V' ? 1 : 2;
+                                $filter3->PAGC_FechaOper    = $comprobante->CPC_Fecha;
+                                
+                                if ($filter3->PAGC_TipoCuenta == 1)
+                                    $filter3->CLIP_Codigo = $comprobante->CLIP_Codigo;
+                                else
+                                    $filter3->PROVP_Codigo = $comprobante->PROVP_Codigo;
+                                
+                                $filter3->PAGC_TDC          = $comprobante->CPC_TDC;
+                                $filter3->PAGC_Monto        = $montopago2;
+                                $filter3->MONED_Codigo      = $value->MONED_Codigo;
+                                $filter3->PAGC_FormaPago    = $formapago2;
+                                $filter3->PAGC_Obs          = ($comprobante->CPC_TipoOperacion == 'V' ? 'INGRESO GENERADO' : 'SALIDA GENERADA') . ' AUTOMATICAMENTE POR EL PAGO AL CONTADO';
+                                $filter3->PAGC_Saldo        = '0';
+
+                                $cod_pago = $this->pago_model->insertar($filter3, '', '', '');
+
+                                $filter5 = new stdClass();
+                                $filter5->CUE_Codigo    = $cuenta_insertada;
+                                $filter5->PAGP_Codigo   = $cod_pago;
+                                $filter5->CPAGC_TDC     = $comprobante->CPC_TDC;
+                                $filter5->CPAGC_Monto   = $montopago2;
+                                $filter5->MONED_Codigo  = $value->MONED_Codigo;
+                                $this->cuentaspago_model->insertar($filter5);
+                            }
+                        } // fin foreach formas2pay
+                    } // fin if formas2pay
+
+                    // Si hubo caja y se obtuvo $id_cierre, vinculamos el comprobante al cierre (una sola vez)
+                    if (!empty($id_cierre)) {
                         $filterFechas = new stdClass();
                         $filterFechas->CPC_FlagEstado = 1;
+                        $filterFechas->CAJCIERRE_Codigo = $id_cierre;
                         $this->comprobante_model->modificar_comprobante($codigo, $filterFechas);
-                        $success = array( "result" => "success" ,"response" => $aceptada["msj"],"serie"=>$comprobante->CPC_Serie,"numero"=>$comprobante->CPC_Numero,"total"=>$comprobante->CPC_total);
                     }
-                }
-                else{
-                    
-                    $success = array( "result" => "error" ,"response" => $aceptada["msj"]);
-                }
+                } // fin else trans_status
+            } else {
+                // Cuando CPC_FlagMueveStock != '0' (no mover stock)
+                $filterFechas = new stdClass();
+                $filterFechas->CPC_FlagEstado = 1;
+                $filterFechas->CAJCIERRE_Codigo = null;
+                $this->comprobante_model->modificar_comprobante($codigo, $filterFechas);
+
+                $success = array(
+                    "result" => "success",
+                    "response" => $aceptada["msj"],
+                    "serie"=>$comprobante->CPC_Serie,
+                    "numero"=>$comprobante->CPC_Numero,
+                    "total"=>$comprobante->CPC_total
+                );
             }
-            else{
-                $success = array( "result" => "error", "response" => "El documento ya fue aprobado anteriormente" );
-            }
-            echo json_encode($success);
+        } else {
+            $success = array( "result" => "error", "response" => $aceptada["msj"]);
         }
+    } else {
+        $success = array( "result" => "error", "response" => "El documento ya fue aprobado anteriormente" );
+    }
+    echo json_encode($success);
+}
+
         
         public function disparador_pos($tipo_oper = 'V', $codigo, $tipo_docu = 'F'){
             
@@ -631,7 +670,7 @@ class Comprobante extends Controller{
                                 $filter->CAJAMOV_Observacion = $comprobante->CPC_Observacion;
                                 $filter->CAJAMOV_FlagEstado = "1";
                                 $filter->CAJAMOV_CodigoUsuario = $this->usuario;
-                                $this->movimientos->guardar_movimiento($filter);
+                                $this->movimientos->guardar_movimiento_cpp($filter);
                             }
                         }
                     }else{
