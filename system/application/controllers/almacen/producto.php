@@ -259,7 +259,7 @@ class Producto extends Controller{
                                         </a>";
 
                //Adicionales para productos 
-             if($this->session->userdata('user') == 1){
+               if($this->session->userdata('user') == 2){
                if ($valor->PROD_FlagEstado == 1) {
                      $eliminar = "<button type='button' onclick='eliminar_producto($valor->PROD_Codigo)' class='btn btn-default' title='Desactivar'><img src='".$this->url."images/eliminar.png' class='image-size-1b'></button>";
                 }else{

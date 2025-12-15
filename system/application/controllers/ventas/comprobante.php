@@ -410,20 +410,19 @@ class Comprobante extends Controller{
         }
 
         public function disparador($tipo_oper = 'V', $codigo, $tipo_docu = 'F'){
-    $aceptada = false;
-    $lotesAsignados = true;
-    
-    $comprobanteInfo = $this->comprobante_model->obtener_comprobante($codigo);
-    $comprobante = $comprobanteInfo[0];
-    
-    if ($comprobante->CPC_FlagEstado == '2'){
+            $aceptada = false;
+            $lotesAsignados = true;
+            
+            $comprobanteInfo = $this->comprobante_model->obtener_comprobante($codigo);
+            $comprobante = $comprobanteInfo[0];
+            
+            if ($comprobante->CPC_FlagEstado == '2'){
+                if ($comprobante->CPC_TipoDocumento == "F" || $comprobante->CPC_TipoDocumento == "B"){
+                    $aceptada = $this->envioSunatFac($codigo, $comprobante);
+                }
 
-        if ($comprobante->CPC_TipoDocumento == "F" || $comprobante->CPC_TipoDocumento == "B"){
-            $aceptada = $this->envioSunatFac($codigo, $comprobante);
-        }
-
-        if ($aceptada["exito"] == true || $comprobante->CPC_TipoDocumento == 'N'){
-            $this->confirmInventariado($codigo);
+            if ($aceptada["exito"] == true || $comprobante->CPC_TipoDocumento == 'N'){
+                $this->confirmInventariado($codigo);
 
             if ($comprobante->CPC_FlagMueveStock == '0') {
                 
@@ -433,7 +432,8 @@ class Comprobante extends Controller{
                 if($this->db->trans_status() == false){
                     $this->db->trans_rollback();
                     $success = array( "result" => "error", "response" => "Intente nuevamente! De persistir el inconveniente, contacte al administrador." );
-                }else{
+                }
+                else{
 
                     if ($comprobante->CPC_TipoOperacion == 'V') {
                         $movimiento = $this->disminuir_stock($comprobante);
@@ -527,9 +527,10 @@ class Comprobante extends Controller{
                                     $this->cajacierre_model->actualizar_cierre($id_cierre, $cierre_actualizado);
                                 }
                             }
-
+                            
                             // Registro contable y pago automático (cuando no hay caja o adicionalmente)
                             // (Se mantiene la lógica existente para cuentas y pagos)
+                            
                             switch ($comprobante->CPC_TipoDocumento) {
                                 case 'F': $codtipodocu = '8'; break;
                                 case 'B': $codtipodocu = '9'; break;
@@ -588,30 +589,33 @@ class Comprobante extends Controller{
                         $filterFechas->CAJCIERRE_Codigo = $id_cierre;
                         $this->comprobante_model->modificar_comprobante($codigo, $filterFechas);
                     }
-                } // fin else trans_status
-            } else {
-                // Cuando CPC_FlagMueveStock != '0' (no mover stock)
-                $filterFechas = new stdClass();
-                $filterFechas->CPC_FlagEstado = 1;
-                $filterFechas->CAJCIERRE_Codigo = null;
-                $this->comprobante_model->modificar_comprobante($codigo, $filterFechas);
-
-                $success = array(
-                    "result" => "success",
-                    "response" => $aceptada["msj"],
-                    "serie"=>$comprobante->CPC_Serie,
-                    "numero"=>$comprobante->CPC_Numero,
-                    "total"=>$comprobante->CPC_total
-                );
+                }
             }
-        } else {
-            $success = array( "result" => "error", "response" => $aceptada["msj"]);
+            else{
+                // Cuando CPC_FlagMueveStock != '0' (no mover stock)
+                    $filterFechas = new stdClass();
+                    $filterFechas->CPC_FlagEstado = 1;
+                    $filterFechas->CAJCIERRE_Codigo = null;
+                    $this->comprobante_model->modificar_comprobante($codigo, $filterFechas);
+                    
+                    $success = array(
+                        "result" => "success",
+                        "response" => $aceptada["msj"],
+                        "serie"=>$comprobante->CPC_Serie,
+                        "numero"=>$comprobante->CPC_Numero,
+                        "total"=>$comprobante->CPC_total
+                    );
+            }
+            }
+            else{
+                $success = array( "result" => "error", "response" => $aceptada["msj"]);
+            }
+            }
+            else{
+                $success = array( "result" => "error", "response" => "El documento ya fue aprobado anteriormente" );
+            }
+            echo json_encode($success);
         }
-    } else {
-        $success = array( "result" => "error", "response" => "El documento ya fue aprobado anteriormente" );
-    }
-    echo json_encode($success);
-}
 
         
         public function disparador_pos($tipo_oper = 'V', $codigo, $tipo_docu = 'F'){
